@@ -8,127 +8,102 @@ This server gives Claude direct access to your Google Workspace — Gmail, Googl
 
 ## What you'll need before starting
 
-- A Mac (these instructions are for macOS)
-- Python 3.10 or higher (check with `python3 --version` in Terminal)
-- Claude Desktop app installed ([download here](https://claude.ai/download) if you don't have it)
-- The `credentials.json` file that Gonçalo sent you (should be attached to the email)
+- Python 3.10 or higher
+- Claude Desktop app installed ([download here](https://claude.ai/download))
+- Claude Code installed (see below)
+- The `credentials.json` file that Gonçalo sent you (attached to the email)
 - About 15 minutes
 
 ---
 
-## Installation — step by step
+## Installation
 
-### Step 1: Open Terminal
+### Step 1: Install Claude Code
 
-Press `Cmd + Space`, type "Terminal", and hit Enter. A black/white window will appear. This is where you'll type all the commands below.
-
-### Step 2: Check that Python is installed
-
-Type this and press Enter:
+If you don't have Claude Code yet, open your terminal (Terminal on Mac, Command Prompt or PowerShell on Windows) and run:
 
 ```bash
-python3 --version
+npm install -g @anthropic-ai/claude-code
 ```
 
-You should see something like `Python 3.11.4`. If you get "command not found", you need to install Python first:
-- Go to https://www.python.org/downloads/
-- Download the latest version for macOS
-- Run the installer
-- Close and reopen Terminal, then try `python3 --version` again
+If you don't have `npm`, install Node.js first from https://nodejs.org (download the LTS version, run the installer, then try the command above again).
 
-### Step 3: Create a folder for MCP servers
+### Step 2: Save the credentials.json file
+
+Download the `credentials.json` file from the email attachment and save it to your Downloads folder. Remember where it is — you'll tell Claude Code about it in the next step.
+
+### Step 3: Let Claude Code do the rest
+
+Open your terminal and run:
 
 ```bash
-mkdir -p ~/Projects
+claude
 ```
 
-This creates a `Projects` folder inside your home directory (if it doesn't exist already).
+Then paste this prompt:
 
-### Step 4: Download the code
+---
 
-```bash
-cd ~/Projects
-git clone https://github.com/goncaloreis/google-workspace-mcp.git
-cd google-workspace-mcp
+**Prompt to paste into Claude Code:**
+
+```
+I need you to install a Google Workspace MCP server on my machine. Here's what to do:
+
+1. Check that Python 3.10+ is installed (run python3 --version on Mac/Linux, or python --version on Windows)
+
+2. Create a Projects folder in my home directory if it doesn't exist
+
+3. Clone the repo:
+   cd ~/Projects (or %USERPROFILE%\Projects on Windows)
+   git clone https://github.com/goncaloreis/google-workspace-mcp.git
+   cd google-workspace-mcp
+
+4. Set up Python virtual environment:
+   python3 -m venv venv (or python -m venv venv on Windows)
+   Activate it and install requirements: pip install -r requirements.txt
+
+5. Copy credentials.json from my Downloads folder into the google-workspace-mcp folder
+
+6. Run "python server.py" once to trigger Google OAuth — this will open my browser. I'll sign in with my Google account and grant permissions. Wait for me to confirm this is done.
+
+7. After I confirm OAuth is complete, configure Claude Desktop by editing the config file:
+   - Mac: ~/Library/Application Support/Claude/claude_desktop_config.json
+   - Windows: %APPDATA%\Claude\claude_desktop_config.json
+   
+   Add this to the mcpServers section (adapt paths for my OS):
+   
+   On Mac:
+   {
+     "mcpServers": {
+       "google-workspace": {
+         "command": "/bin/bash",
+         "args": ["-c", "cd $HOME/Projects/google-workspace-mcp && source venv/bin/activate && python server.py"]
+       }
+     }
+   }
+   
+   On Windows:
+   {
+     "mcpServers": {
+       "google-workspace": {
+         "command": "cmd",
+         "args": ["/c", "cd /d %USERPROFILE%\\Projects\\google-workspace-mcp && venv\\Scripts\\activate && python server.py"]
+       }
+     }
+   }
+
+   If the file already has other MCP servers, merge this into the existing mcpServers object.
+
+8. Tell me to restart Claude Desktop (Cmd+Q on Mac, or close fully on Windows) and reopen it.
+
+Start by checking my OS and Python version, then proceed step by step. Ask me if anything is unclear.
 ```
 
-If you get "git: command not found", run `xcode-select --install` first, then try again.
+---
 
-### Step 5: Set up the Python environment
+### Step 4: Verify it works
 
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
-
-You should see a bunch of packages being installed. Wait for it to finish.
-
-### Step 6: Add the credentials file
-
-Take the `credentials.json` file that Gonçalo sent you and put it in the project folder. You can do this by dragging it into Finder at `~/Projects/google-workspace-mcp/`, or with Terminal:
-
-```bash
-cp ~/Downloads/credentials.json ~/Projects/google-workspace-mcp/credentials.json
-```
-
-(Adjust the path if you saved it somewhere other than Downloads.)
-
-### Step 7: Authenticate with your Google account
-
-```bash
-python3 server.py
-```
-
-This will open your web browser and ask you to sign in with your Google account. **Sign in with your Stake Capital Google account** (your @stake.capital email).
-
-You'll see a warning saying "Google hasn't verified this app" — this is normal for internal tools. Click **"Advanced"** → **"Go to [app name] (unsafe)"** → then **"Allow"** on each permission screen.
-
-Once you've granted permissions, go back to Terminal. You should see the server running. Press `Ctrl + C` to stop it.
-
-A `token.json` file has been created — this stores your personal access. **Never share this file.**
-
-### Step 8: Connect it to Claude Desktop
-
-Open this file in a text editor:
-
-```bash
-open -a TextEdit ~/Library/Application\ Support/Claude/claude_desktop_config.json
-```
-
-If the file doesn't exist yet, create it:
-
-```bash
-mkdir -p ~/Library/Application\ Support/Claude
-echo '{}' > ~/Library/Application\ Support/Claude/claude_desktop_config.json
-open -a TextEdit ~/Library/Application\ Support/Claude/claude_desktop_config.json
-```
-
-Replace the contents with this (or add to the existing `mcpServers` section):
-
-```json
-{
-  "mcpServers": {
-    "google-workspace": {
-      "command": "/bin/bash",
-      "args": [
-        "-c",
-        "cd $HOME/Projects/google-workspace-mcp && source venv/bin/activate && python server.py"
-      ]
-    }
-  }
-}
-```
-
-Save and close the file.
-
-### Step 9: Restart Claude Desktop
-
-Quit Claude Desktop completely (`Cmd + Q`) and reopen it.
-
-### Step 10: Verify it works
-
-In Claude Desktop, you should see a small hammer/tools icon (🔨) at the bottom of the chat input. Click it and you should see tools like `google_docs_create`, `gmail_search`, `google_sheets_read`, etc.
+After restarting Claude Desktop, you should see a tools icon (🔨) at the bottom of the chat input. Click it and you should see tools like `google_docs_create`, `gmail_search`, `google_sheets_read`, etc.
 
 Try asking Claude: **"Search my email for the most recent message from Gonçalo"**
 
@@ -138,21 +113,19 @@ If it works, you're done! 🎉
 
 ## Troubleshooting
 
-**"I don't see the tools icon in Claude"**
-- Make sure you saved the config file correctly (check for typos, especially in the path)
+**"Google hasn't verified this app" warning during sign-in**
+This is normal for internal tools. Click **"Advanced"** → **"Go to [app name] (unsafe)"** → **"Allow"**.
+
+**"access_denied" or "blocked" during Google sign-in**
+Contact Gonçalo — he may need to add you as a test user in the Google Cloud project.
+
+**Tools don't show up in Claude Desktop**
+- Check the config file for typos
 - Make sure you fully quit and restarted Claude Desktop
-- Check the file at `~/Library/Application Support/Claude/claude_desktop_config.json` is valid JSON
+- Ask Claude Code to check that the config file is valid JSON
 
-**"Google sign-in failed"**
-- Make sure you're signing in with your @stake.capital Google account
-- If you see "access blocked", contact Gonçalo — he may need to add you as a test user in the Google Cloud project
-
-**"Python not found" or "venv not found"**
-- Make sure Python 3.10+ is installed
-- Try using the full path: replace `python` with `python3` everywhere
-
-**"Permission denied"**
-- Run: `chmod +x ~/Projects/google-workspace-mcp/server.py`
+**Any other error**
+Paste the error message to Gonçalo on Slack.
 
 ---
 
@@ -170,3 +143,11 @@ Once installed, you can ask Claude things like:
 - "Add a slide to my presentation about [topic]"
 
 Claude will use the tools automatically — you just ask in plain language.
+
+---
+
+## Security notes
+
+- `credentials.json` identifies the app, not any person's account. It's shared and safe to have.
+- `token.json` is YOUR personal access token, created when you sign in. **Never share this file.**
+- The `.gitignore` is configured to exclude both `token.json` and any other sensitive files from git.
