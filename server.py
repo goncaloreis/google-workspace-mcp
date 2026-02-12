@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
 """
-Google Workspace MCP Server (v11 - Google Tasks)
+Google Workspace MCP Server (v12 - Shared Drive Support)
 
 🎉 98 TOOLS TOTAL - COMPREHENSIVE GOOGLE WORKSPACE AUTOMATION 🎉
 
-CHANGELOG from v10:
+CHANGELOG from v11:
+- Added Shared Drive (Team Drive) support to all Drive API calls
+- Added supportsAllDrives=True to all files() and permissions() method calls
+- Added includeItemsFromAllDrives=True to files().list() calls
+- Added corpora='allDrives' to search_drive() for cross-drive search
+- Fixes 404 errors when accessing files in Shared Drives
+
+PREVIOUS (v10):
 - Added Google Tasks API as the 7th Google Workspace service
 - Added tasks scope: https://www.googleapis.com/auth/tasks
 - NOTE: Delete token.json and re-authenticate to pick up the new scope
@@ -1840,9 +1847,10 @@ async def create_doc(args: dict) -> list[TextContent]:
     
     if args.get("folder_id"):
         google_client.drive_service.files().update(
-            fileId=doc_id, addParents=args["folder_id"], removeParents='root', fields='id, parents'
+            fileId=doc_id, addParents=args["folder_id"], removeParents='root', fields='id, parents',
+            supportsAllDrives=True
         ).execute()
-    
+
     return [TextContent(type="text", text=f"Created document '{args['title']}'\nID: {doc_id}\nURL: https://docs.google.com/document/d/{doc_id}/edit")]
 
 
@@ -2730,7 +2738,8 @@ async def create_sheet(args: dict) -> list[TextContent]:
             fileId=ss_id,
             addParents=args['folder_id'],
             removeParents='root',
-            fields='id, parents'
+            fields='id, parents',
+            supportsAllDrives=True
         ).execute()
 
     return [TextContent(type="text", text=f"Created spreadsheet '{args['title']}'\nID: {ss_id}\nURL: https://docs.google.com/spreadsheets/d/{ss_id}/edit")]
@@ -3305,7 +3314,8 @@ async def list_drive(args: dict) -> list[TextContent]:
     
     results = google_client.drive_service.files().list(
         q=query, pageSize=50,
-        fields="files(id, name, mimeType, modifiedTime, size)"
+        fields="files(id, name, mimeType, modifiedTime, size)",
+        supportsAllDrives=True, includeItemsFromAllDrives=True
     ).execute()
     
     files = results.get("files", [])
@@ -3338,7 +3348,9 @@ async def search_drive(args: dict) -> list[TextContent]:
     
     results = google_client.drive_service.files().list(
         q=query, pageSize=max_results,
-        fields="files(id, name, mimeType, modifiedTime, webViewLink)"
+        fields="files(id, name, mimeType, modifiedTime, webViewLink)",
+        supportsAllDrives=True, includeItemsFromAllDrives=True,
+        corpora='allDrives'
     ).execute()
     
     files = results.get("files", [])
@@ -3355,7 +3367,8 @@ async def search_drive(args: dict) -> list[TextContent]:
 async def get_drive_file(args: dict) -> list[TextContent]:
     file = google_client.drive_service.files().get(
         fileId=args["file_id"],
-        fields="id, name, mimeType, size, createdTime, modifiedTime, owners, webViewLink, parents"
+        fields="id, name, mimeType, size, createdTime, modifiedTime, owners, webViewLink, parents",
+        supportsAllDrives=True
     ).execute()
     
     output = [
@@ -3381,7 +3394,7 @@ async def create_folder(args: dict) -> list[TextContent]:
     if args.get("parent_id"):
         metadata["parents"] = [args["parent_id"]]
     
-    folder = google_client.drive_service.files().create(body=metadata, fields="id, name, webViewLink").execute()
+    folder = google_client.drive_service.files().create(body=metadata, fields="id, name, webViewLink", supportsAllDrives=True).execute()
     
     return [TextContent(type="text", text=f"Created folder '{args['name']}'\nID: {folder.get('id')}\nLink: {folder.get('webViewLink')}")]
 
@@ -3391,20 +3404,21 @@ async def copy_file(args: dict) -> list[TextContent]:
     if args.get("folder_id"):
         body["parents"] = [args["folder_id"]]
     
-    copied = google_client.drive_service.files().copy(fileId=args["file_id"], body=body, fields="id, name, webViewLink").execute()
+    copied = google_client.drive_service.files().copy(fileId=args["file_id"], body=body, fields="id, name, webViewLink", supportsAllDrives=True).execute()
     
     return [TextContent(type="text", text=f"Copied to '{copied.get('name')}'\nID: {copied.get('id')}\nLink: {copied.get('webViewLink')}")]
 
 
 async def move_file(args: dict) -> list[TextContent]:
-    file = google_client.drive_service.files().get(fileId=args["file_id"], fields="parents").execute()
+    file = google_client.drive_service.files().get(fileId=args["file_id"], fields="parents", supportsAllDrives=True).execute()
     previous_parents = ",".join(file.get("parents", []))
-    
+
     google_client.drive_service.files().update(
         fileId=args["file_id"],
         addParents=args["new_parent_id"],
         removeParents=previous_parents,
-        fields="id, parents"
+        fields="id, parents",
+        supportsAllDrives=True
     ).execute()
     
     return [TextContent(type="text", text=f"Moved file {args['file_id']} to folder {args['new_parent_id']}")]
@@ -3414,7 +3428,8 @@ async def rename_file(args: dict) -> list[TextContent]:
     google_client.drive_service.files().update(
         fileId=args["file_id"],
         body={"name": args["new_name"]},
-        fields="id, name"
+        fields="id, name",
+        supportsAllDrives=True
     ).execute()
     
     return [TextContent(type="text", text=f"Renamed to '{args['new_name']}'")]
@@ -3423,7 +3438,8 @@ async def rename_file(args: dict) -> list[TextContent]:
 async def delete_file(args: dict) -> list[TextContent]:
     google_client.drive_service.files().update(
         fileId=args["file_id"],
-        body={"trashed": True}
+        body={"trashed": True},
+        supportsAllDrives=True
     ).execute()
     
     return [TextContent(type="text", text=f"Moved {args['file_id']} to trash")]
@@ -3442,7 +3458,8 @@ async def share_file(args: dict) -> list[TextContent]:
         fileId=args["file_id"],
         body=permission,
         sendNotificationEmail=notify,
-        fields="id"
+        fields="id",
+        supportsAllDrives=True
     ).execute()
     
     return [TextContent(type="text", text=f"Shared with {args['email']} as {args['role']}")]
@@ -3451,7 +3468,8 @@ async def share_file(args: dict) -> list[TextContent]:
 async def list_permissions(args: dict) -> list[TextContent]:
     permissions = google_client.drive_service.permissions().list(
         fileId=args["file_id"],
-        fields="permissions(id, emailAddress, role, type, displayName)"
+        fields="permissions(id, emailAddress, role, type, displayName)",
+        supportsAllDrives=True
     ).execute()
     
     perms = permissions.get("permissions", [])
@@ -3479,7 +3497,7 @@ async def export_file(args: dict) -> list[TextContent]:
     if not mime_type:
         return [TextContent(type="text", text=f"Unsupported format: {args['export_format']}")]
     
-    request = google_client.drive_service.files().export_media(fileId=args["file_id"], mimeType=mime_type)
+    request = google_client.drive_service.files().export_media(fileId=args["file_id"], mimeType=mime_type, supportsAllDrives=True)
     
     output_path = Path(args["output_path"])
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -3507,14 +3525,15 @@ async def upload_file(args: dict) -> list[TextContent]:
     media = MediaFileUpload(str(local_path), mimetype=mime_type)
     
     file = google_client.drive_service.files().create(
-        body=metadata, media_body=media, fields="id, name, webViewLink"
+        body=metadata, media_body=media, fields="id, name, webViewLink",
+        supportsAllDrives=True
     ).execute()
     
     return [TextContent(type="text", text=f"Uploaded '{file.get('name')}'\nID: {file.get('id')}\nLink: {file.get('webViewLink')}")]
 
 
 async def download_file(args: dict) -> list[TextContent]:
-    request = google_client.drive_service.files().get_media(fileId=args["file_id"])
+    request = google_client.drive_service.files().get_media(fileId=args["file_id"], supportsAllDrives=True)
     
     output_path = Path(args["output_path"])
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -3891,7 +3910,8 @@ async def create_slides(args: dict) -> list[TextContent]:
     
     if args.get("folder_id"):
         google_client.drive_service.files().update(
-            fileId=pres_id, addParents=args["folder_id"], removeParents='root', fields='id, parents'
+            fileId=pres_id, addParents=args["folder_id"], removeParents='root', fields='id, parents',
+            supportsAllDrives=True
         ).execute()
     
     return [TextContent(type="text", text=f"Created presentation '{args['title']}'\nID: {pres_id}\nURL: https://docs.google.com/presentation/d/{pres_id}/edit")]
@@ -4305,7 +4325,7 @@ async def main():
         logger.error("Failed to authenticate")
         return
 
-    logger.info("Google Workspace MCP Server (v11 - Google Tasks) starting...")
+    logger.info("Google Workspace MCP Server (v12 - Shared Drive Support) starting...")
     logger.info("New v11 tools: tasks_list_tasklists, tasks_create_tasklist, tasks_delete_tasklist, tasks_list_tasks, tasks_get_task, tasks_create_task, tasks_update_task, tasks_delete_task, tasks_complete_task, tasks_move_task, tasks_clear_completed, tasks_search_tasks")
     logger.info("🎉 98 total tools across 7 Google Workspace APIs 🎉")
     async with stdio_server() as (read_stream, write_stream):
